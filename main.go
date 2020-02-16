@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/AlexeyRyabichev/ShowItGate/internal"
 )
@@ -76,6 +78,7 @@ func initRouter() {
 			r.Method,
 			r.RequestURI,
 		)
+		w.WriteHeader(http.StatusNotFound)
 	})
 }
 
@@ -109,7 +112,7 @@ func NodePost(w http.ResponseWriter, r *http.Request) {
 			Name:        gateway.Name,
 			Method:      gateway.Method,
 			Pattern:     path.Join(node.Base, gateway.Path),
-			HandlerFunc: nil,
+			HandlerFunc: proxyFunc,
 		})
 	}
 	nodes[node.Base] = node
@@ -120,4 +123,46 @@ func NodePost(w http.ResponseWriter, r *http.Request) {
 
 func Index(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello World!")
+}
+
+func proxyFunc(w http.ResponseWriter, r *http.Request) {
+	pathElements := strings.Split(r.URL.Path, "/")
+	base := fmt.Sprintf("/%s/%s", pathElements[1], pathElements[2])
+
+	if _, ok := nodes[base]; !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	node := nodes[base]
+
+	newURL := r.URL
+	newURL.Host = node.Host
+	newURL.Scheme = node.Scheme
+
+	req, err := http.NewRequest(r.Method, newURL.String(), r.Body)
+	req.Header = r.Header
+
+	httpClient := http.Client{}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		w.WriteHeader(resp.StatusCode)
+	}
+
+	for name, value := range resp.Header {
+		w.Header().Set(name, strings.Join(value, ""))
+	}
+
+	w.Write(bodyBytes)
 }
