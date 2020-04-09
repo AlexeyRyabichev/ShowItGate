@@ -7,8 +7,13 @@ import (
 	"github.com/AlexeyRyabichev/ShowItGate/internal"
 )
 
+var cfgFile = "cfg.json"
+
 func main() {
-	routerCfg := internal.RouterCfg{Name: "ShowItGate"}
+	routerCfg, err := internal.ReadCfgFromJSON(cfgFile)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	router := internal.NewRouter(routerCfg)
 

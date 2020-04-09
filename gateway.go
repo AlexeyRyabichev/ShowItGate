@@ -1,4 +1,4 @@
-package public
+package ShowItGate
 
 type Gateway struct {
 	Name   string `json:"name"`

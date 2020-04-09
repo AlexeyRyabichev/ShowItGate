@@ -1,11 +1,13 @@
 package internal
 
 import (
+	"encoding/json"
 	"github.com/gorilla/mux"
+	"io/ioutil"
 	"log"
 	"net/http"
 
-	"github.com/AlexeyRyabichev/ShowItGate/public"
+	"github.com/AlexeyRyabichev/ShowItGate"
 )
 
 type Route struct {
@@ -16,22 +18,25 @@ type Route struct {
 }
 
 type RouterCfg struct {
-	Name string
+	Name    string
+	Nodes   map[string]ShowItGate.NodeCfg
+	ApiKeys map[string]bool
 }
 
 type Router struct {
 	cfg    RouterCfg
 	routes []Route
 
-	Nodes  map[string]Node
+	//Nodes  map[string]ShowItGate.NodeCfg
 	Router *mux.Router
 }
 
 func NewRouter(cfg RouterCfg) *Router {
 	router := Router{
-		cfg:   cfg,
-		Nodes: make(map[string]Node),
+		cfg: cfg,
+		//Nodes: make(map[string]ShowItGate.NodeCfg),
 	}
+
 	router.routes = []Route{
 		{
 			Name:        "Index",
@@ -70,11 +75,46 @@ func (rt *Router) initRouter() {
 func (rt *Router) addRoute(route Route) {
 	var handler http.Handler
 	handler = route.HandlerFunc
-	handler = public.Logger(handler, route.Name)
+	handler = ShowItGate.Logger(handler, route.Name)
 
 	rt.Router.
 		Methods(route.Method).
 		Path(route.Pattern).
 		Name(route.Name).
 		Handler(handler)
+}
+
+func ReadCfgFromJSON(jsonFile string) (RouterCfg, error) {
+	file, err := ioutil.ReadFile(jsonFile)
+	if err != nil {
+		return newRouterCfg(), err
+	}
+
+	cfg := RouterCfg{}
+	if err := json.Unmarshal(file, &cfg); err != nil {
+		return newRouterCfg(), err
+	}
+
+	return cfg, nil
+}
+
+func (cfg *RouterCfg) SaveCfgToJSON(jsonFile string) error {
+	file, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if err := ioutil.WriteFile(jsonFile, file, 0666); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func newRouterCfg() RouterCfg{
+	return RouterCfg{
+		Name:    "ShowItGate",
+		Nodes:   make(map[string]ShowItGate.NodeCfg),
+		ApiKeys: make(map[string]bool),
+	}
 }
