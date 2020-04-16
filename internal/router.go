@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"path"
 
 	"github.com/AlexeyRyabichev/ShowItGate"
 )
@@ -62,6 +63,17 @@ func (rt *Router) initRouter() {
 		rt.addRoute(route)
 	}
 
+	for _, node := range rt.cfg.Nodes{
+		for _, gateway := range node.Gateways {
+			rt.addRoute(Route{
+				Name:        gateway.Name,
+				Method:      gateway.Method,
+				Pattern:     path.Join(node.Base, gateway.Path),
+				HandlerFunc: rt.proxyFunc,
+			})
+		}
+	}
+
 	rt.Router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf(
 			"HANDLER NOT FOUND FOR REQUEST: %s %s",
@@ -75,13 +87,15 @@ func (rt *Router) initRouter() {
 func (rt *Router) addRoute(route Route) {
 	var handler http.Handler
 	handler = route.HandlerFunc
-	handler = ShowItGate.Logger(handler, route.Name)
+	//handler = ShowItGate.Logger(handler, route.Name)
 
 	rt.Router.
 		Methods(route.Method).
 		Path(route.Pattern).
 		Name(route.Name).
 		Handler(handler)
+
+	log.Printf("registered route %s", route.Pattern)
 }
 
 func ReadCfgFromJSON(jsonFile string) (RouterCfg, error) {
