@@ -87,7 +87,7 @@ func (rt *Router) initRouter() {
 func (rt *Router) addRoute(route Route) {
 	var handler http.Handler
 	handler = route.HandlerFunc
-	//handler = ShowItGate.Logger(handler, route.Name)
+	handler = ShowItGate.Logger(handler, route.Name)
 
 	rt.Router.
 		Methods(route.Method).
